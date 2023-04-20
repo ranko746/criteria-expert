@@ -1,21 +1,23 @@
-// Require express and create an instance of it
-var express = require('express');
+var express = require("express");
+var bodyParser = require("body-parser");
+var http = require("http");
 var app = express();
+var cors = require('cors')
+var server = http.createServer(app);
+app.use(bodyParser.urlencoded({ extended: false }));
+app.use(bodyParser.json());
+app.use(cors());
 
-// on the request to root (localhost:3000/)
-app.get('/', function (req, res) {
-  console.log(req.params);
-  // var username = req.params.user;
-  // var category = req.params.categorySlug;
-  res.send(req.params);
+app.use(function(err, req, res, next) {
+  // res.header("Access-Control-Allow-Origin", "https://www.sandbox.paypal.com");
+  res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+  next(err);
 });
 
-// Change the 404 message modifing the middleware
-app.use(function(req, res, next) {
-  res.status(404).send("Sorry, that route doesn't exist. Have a nice day :)");
-});
+var ChatRoute = require('./ChatRoute');
 
-// start the server in the port 3000 !
-app.listen(3000, function () {
-  console.log('Example app listening on port 3000.');
+app.use("/api",ChatRoute);
+
+server.listen(4000, function () {
+    console.log('App is running on port 4000!');
 });

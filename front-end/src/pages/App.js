@@ -1,6 +1,6 @@
 import * as React from 'react';
-import { Container, Box, Stack, Tab, TextField, Button, TableContainer, Table, TableHead, TableBody, TableCell, TableRow, Paper } from '@mui/material';
-import { TabContext, TabList, TabPanel } from '@mui/lab';
+import axios from "axios";
+import { Container, Box, TextField, Button, TableContainer, Table, TableHead, TableBody, TableCell, TableRow, Paper } from '@mui/material';
 import styled from "styled-components";
 
 export const Wrapper = styled(Container)`
@@ -27,7 +27,7 @@ export const Wrapper = styled(Container)`
   }
 
   .answer-list {
-    margin-top: 20px;
+    margin: 20px 0;
 
     thead {
       background: lightgrey;
@@ -35,26 +35,40 @@ export const Wrapper = styled(Container)`
   }
 `;
 
-function createData(content) {
-  return { content };
-}
-
-const rows = [
-  createData('Frozen yoghurt This is answer This is answer This is answer This is answer This is answer This is answer This is answer This is answer This is answer This is answer '),
-  createData('Frozen yoghurt'),
-  createData('Frozen yoghurt'),
-  createData('Frozen yoghurt'),
-  createData('Frozen yoghurt'),
-  createData('Frozen yoghurt'),
-  createData('Frozen yoghurt'),
-];
-
 const App = () => {
+  const base_url = 'http://localhost:4000/api/getAnswer';
+
   const [value, setValue] = React.useState('1');
+  const [question, setQuestion] = React.useState('');
+  const [answers, setAnswers] = React.useState([]);
 
   const handleChange = (event, newValue) => {
     setValue(newValue);
   };
+
+  const handleQueryChange = (event) => {
+    console.log(event.target.value);
+    setQuestion(event.target.value);
+  };
+
+  const handleSubmit = async () => {
+    const questionTemplatePrefix = 'Here is one question. "';
+    const questionTemplateSuffix = `"
+    give me 50 answers for this question. the output will be json array string like following:
+    [{content: 'XXX'},
+    {content: 'XXXX'},
+    ... ,
+    {content: 'XXXX'}]`;
+    let res = await axios.post(
+      base_url, 
+      {
+        question: questionTemplatePrefix + question + questionTemplateSuffix
+      }
+    );
+    let data = res.data ;
+    console.log("response data ===> ", data);
+    setAnswers(JSON.parse(data.message))
+  }
 
   return (
     <Wrapper>
@@ -62,10 +76,12 @@ const App = () => {
         <TextField
           hiddenLabel
           placeholder='Enter question'
-          defaultValue=""
+          defaultValue={ question }
+          onChange={ handleQueryChange }
         />
         <Button 
           variant="outlined"
+          onClick={ handleSubmit }
         >Submit</Button>
       </Box>
       <Box>
@@ -78,7 +94,7 @@ const App = () => {
             </TableRow>
           </TableHead>
           <TableBody>
-            {rows.map((row, index) => (
+            {answers.map((row, index) => (
               <TableRow
                 key={index}
                 sx={{ '&:last-child td, &:last-child th': { border: 0 } }}
