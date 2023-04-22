@@ -1,23 +1,37 @@
-var express = require("express");
-var bodyParser = require("body-parser");
-var http = require("http");
-var app = express();
+const express = require('express');
 var cors = require('cors')
-var server = http.createServer(app);
-app.use(bodyParser.urlencoded({ extended: false }));
-app.use(bodyParser.json());
+const bodyParser = require('body-parser');
+
+// create express app
+const app = express();
+
+// Setup server port
+const port = process.env.PORT || 5000;
+
+// parse requests of content-type - application/x-www-form-urlencoded
+app.use(bodyParser.urlencoded({ extended: true }))
+
+// parse requests of content-type - application/json
+app.use(bodyParser.json())
+
 app.use(cors());
 
-app.use(function(err, req, res, next) {
-  // res.header("Access-Control-Allow-Origin", "https://www.sandbox.paypal.com");
-  res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
-  next(err);
+// define a root route
+app.get('/', (req, res) => {
+  res.send("Hello World");
 });
 
-var ChatRoute = require('./ChatRoute');
+// Require routes
+const chatRoutes = require('./src/routes/chat.routes');
+const answerRoutes = require('./src/routes/answer.routes')
+const questionRoutes = require('./src/routes/question.routes')
 
-app.use("/api",ChatRoute);
+// using as middleware
+app.use("/api/v1/ai",chatRoutes);
+app.use("/api/v1/answer",answerRoutes);
+app.use("/api/v1/question",questionRoutes);
 
-server.listen(4000, function () {
-    console.log('App is running on port 4000!');
+// listen for requests
+app.listen(port, () => {
+  console.log(`Server is listening on port ${port}`);
 });

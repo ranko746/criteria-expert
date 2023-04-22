@@ -87,12 +87,15 @@ export const Wrapper = styled(Container)`
 `;
 
 const App = () => {
-  const base_url = 'http://localhost:4000/api/getAnswer';
+  const base_url = 'http://localhost:5000/api/v1';
   
   const [tabId, setTabId] = React.useState(ANSWER_STATUS.YES);
   const [question, setQuestion] = React.useState('');
+  const [questionId, setQuestionId] = React.useState(0);
   const [detailId, setDetailId] = React.useState(0);
+
   const [answers, setAnswers] = React.useState([]);
+  const [answersFromDB, setAnswersFromDB] = React.useState([]);
 
   const [isLoading, setIsLoading] = React.useState(false);
   const [inputError, setInputError] = React.useState(false);
@@ -107,12 +110,37 @@ const App = () => {
     console.log(detailId);
   };
 
-  const handleStatusChange = (index, status) => {
-    const _answers = answers.map((el, idx)=>{
-      if (idx === index) return {...el, status: status}
-      return el
-    })
-    setAnswers(_answers)
+  const handleSaveAnswer = async (index, status) => {
+    const answer = answers[index];
+    
+    console.log("q_id, title, description", questionId, answer.title, answer.description);
+    try {
+      let res = await axios.post(
+        base_url + '/answer', 
+        {
+          q_id: questionId,
+          title: answer.title,
+          description: answer.description,
+          link: answer.link,
+          status: status,
+        }
+      );
+      
+      let data = res.data.data;
+      console.log(data);
+    
+      setAnswersFromDB(data);
+
+      const _answers = answers.map((el, idx)=>{
+        if (idx === index) return {...el, status: status}
+        return el
+      })
+      setAnswers(_answers)
+      
+    } catch (error) {
+      console.error("Something went wrong.");
+      console.error(error);
+    }
   };
 
   const handleQueryChange = (event) => {
@@ -123,20 +151,28 @@ const App = () => {
     setInputError(false);
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = () => {
     if (question === '') {
       setInputError(true);
       return;
     }
 
+    setAnswers([]);
+
+    getAiAnswers();
+
+    getAnswersByQuestion();
+  }
+
+  const getAiAnswers = async () => {
     setIsLoading(true);
 
     const questionTemplatePrefix = 'Here is one question. "';
-    const questionTemplateSuffix = '". write 50 answers and descriptions for this question. the output should be array of objects in javascript and sorted by answer with alphabetical. and the each item of outputs should have "id", "answer" and "description" which means detail info of each "answer".  this is a style. [{id: 1, answer: "XXX", description: "YYY"}] write only json array without any description and explanation.';
+    const questionTemplateSuffix = '". write 5 answers, descriptions with link of each answer for this question. the output should be array of objects in javascript and sorted by answer with alphabetical. and the each item of outputs should have "id", "title" which means answer and "description" which means detail info of each answer.  this is a style. [{id: 1, title: "XXX", description: "YYY", link: "ZZZ"}] write only json array without any description and explanation.';
     
     try {
       let res = await axios.post(
-        base_url, 
+        base_url + '/ai/getAnswer', 
         {
           question: questionTemplatePrefix + question + questionTemplateSuffix
         }
@@ -153,6 +189,27 @@ const App = () => {
     }
     
     setIsLoading(false);
+  }
+
+  const getAnswersByQuestion = async () => {
+    try {
+      let res = await axios.post(
+        base_url + '/question/findByTitle',
+        {
+          title: question
+        }
+      );
+
+      let data = res.data.data;
+      console.log("data => ", data);
+      console.log("data.q_id => ", data.q_id);
+      console.log("data.answers => ", data.answers);
+
+      setQuestionId(data.q_id);
+      setAnswersFromDB(data.answers);
+    } catch (error) {
+      console.error(error);
+    }
   }
 
   return (
@@ -189,27 +246,28 @@ const App = () => {
           }
         >
           {answers.map((row, index) => (
-            <div key={index}>
-              <ListItem >
-                <ListItemText primary={ row.answer } />
-                <ButtonGroup variant="outlined" aria-label="outlined button group">
-                    <Button className={ row.status === ANSWER_STATUS.YES ? 'active' : '' } onClick={ ()=> handleStatusChange(index, ANSWER_STATUS.YES) }>Yes</Button>
-                    <Button className={ row.status === ANSWER_STATUS.MAYBE ? 'active' : '' } onClick={ ()=>handleStatusChange(index, ANSWER_STATUS.MAYBE) }>Maybe</Button>
-                    <Button className={ row.status === ANSWER_STATUS.NO ? 'active' : '' } onClick={ ()=> handleStatusChange(index, ANSWER_STATUS.NO) }>No</Button>
-                  </ButtonGroup>
-              </ListItem>
-              <Divider />
-            </div>
+            row.status === undefined || row.status === ANSWER_STATUS.NONE
+            ?
+              <div key={index}>
+                <ListItem >
+                  <ListItemText primary={ row.title } />
+                  <ButtonGroup variant="outlined" aria-label="outlined button group">
+                      <Button className={ row.status === ANSWER_STATUS.YES ? 'active' : '' } onClick={ ()=> handleSaveAnswer(index, ANSWER_STATUS.YES) }>Yes</Button>
+                      <Button className={ row.status === ANSWER_STATUS.MAYBE ? 'active' : '' } onClick={ ()=>handleSaveAnswer(index, ANSWER_STATUS.MAYBE) }>Maybe</Button>
+                      <Button className={ row.status === ANSWER_STATUS.NO ? 'active' : '' } onClick={ ()=> handleSaveAnswer(index, ANSWER_STATUS.NO) }>No</Button>
+                    </ButtonGroup>
+                </ListItem>
+                <Divider />
+              </div>
+            :
+            null
           ))}
         </List>
         
         <Box className="categories">
           <TabContext value={tabId}>
             <Box className="tab-header">
-              <TabList 
-                onChange={handleTabChange} 
-                
-              >
+              <TabList onChange={handleTabChange} >
                 <Tab label="Yes" value={ ANSWER_STATUS.YES } />
                 <Tab label="Maybe" value={ ANSWER_STATUS.MAYBE } />
                 <Tab label="No" value={ ANSWER_STATUS.NO } />
@@ -217,7 +275,7 @@ const App = () => {
             </Box>
             <TabPanel value={ ANSWER_STATUS.YES }>
               <CustomTabList
-                answers={ answers }
+                answers={ answersFromDB }
                 detailId={ detailId }
                 tabId={ ANSWER_STATUS.YES }
                 handleCollapseChange= { handleCollapseChange }
@@ -225,7 +283,7 @@ const App = () => {
             </TabPanel>
             <TabPanel value={ ANSWER_STATUS.MAYBE }>
               <CustomTabList
-                answers={ answers }
+                answers={ answersFromDB }
                 detailId={ detailId }
                 tabId={ ANSWER_STATUS.MAYBE }
                 handleCollapseChange= { handleCollapseChange }
@@ -233,7 +291,7 @@ const App = () => {
             </TabPanel>
             <TabPanel value={ ANSWER_STATUS.NO }>
               <CustomTabList
-                answers={ answers }
+                answers={ answersFromDB }
                 detailId={ detailId }
                 tabId={ ANSWER_STATUS.NO }
                 handleCollapseChange= { handleCollapseChange }

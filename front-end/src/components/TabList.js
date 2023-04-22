@@ -16,13 +16,14 @@ const CustomTabList = (props) => {
         row.status === tabId ?
           <div key={index}>
             <ListItemButton onClick={ () => handleCollapseChange(row.id)}>
-              <ListItemText primary={ row.answer } />
+              <ListItemText primary={ row.title } />
               {detailId === row.id ? <ExpandLess /> : <ExpandMore />}
             </ListItemButton>
             <Collapse in={ detailId === row.id } timeout="auto" unmountOnExit>
               <List>
-                <ListItem sx={{ pl: 4 }}>
+                <ListItem sx={{ pl: 4, display: "block" }}>
                   <ListItemText primary={ row.description } />
+                  <ListItemText primary={ row.link } sx={{ wordWrap: "break-word" }}/>
                 </ListItem>
               </List>
             </Collapse>

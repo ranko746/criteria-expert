@@ -1,10 +1,13 @@
 const methods = {};
+
+require('dotenv').config()
 const { Configuration, OpenAIApi } = require("openai");
 
 const configuration = new Configuration({
-  apiKey: "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",
+  apiKey: `${process.env.API_KEY}`,
 });
 const openai = new OpenAIApi(configuration);
+
 methods.getAnswer = (req) => {
     return new Promise(async(resolve, reject) => {
       try {
@@ -27,4 +30,5 @@ methods.getAnswer = (req) => {
       }
     })
 }
+
 module.exports = methods;
