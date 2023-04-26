@@ -1,9 +1,9 @@
 import * as React from 'react';
 import axios from "axios";
-import { Container, Box, Stack, TextField, Button, ButtonGroup, Tab, List, ListSubheader, ListItem, ListItemText, Divider, CircularProgress, Typography} from '@mui/material';
+import { Container, Box, Stack, TextField, Button, ButtonGroup, Tab, List, ListSubheader, ListItemButton, ListItem, ListItemText, Divider, CircularProgress, Typography, Collapse} from '@mui/material';
 import { TabList, TabPanel, TabContext } from '@mui/lab';
 import styled from "styled-components";
-import CustomTabList from '../components/TabList';
+import CustomTabList from '../components/CustomTabList';
 
 const ANSWER_STATUS = {
   NONE: '0',
@@ -92,8 +92,11 @@ const App = () => {
   const [tabId, setTabId] = React.useState(ANSWER_STATUS.YES);
   const [question, setQuestion] = React.useState('');
   const [questionId, setQuestionId] = React.useState(0);
-  const [detailId, setDetailId] = React.useState(0);
 
+  const [detailQuestionId, setDetailQuestionId] = React.useState(0);
+  const [detailAnswerId, setDetailAnswerId] = React.useState(0);
+
+  const [questions, setQuestions] = React.useState([]);
   const [answers, setAnswers] = React.useState([]);
   const [answersFromDB, setAnswersFromDB] = React.useState([]);
 
@@ -101,17 +104,18 @@ const App = () => {
   const [inputError, setInputError] = React.useState(false);
 
   const handleTabChange = (event, newValue) => {
-    setDetailId(0);
+    setDetailAnswerId(0);
     setTabId(newValue);
   };
 
   const handleCollapseChange = (newValue) => {
-    setDetailId(detailId === newValue ? 0 : newValue);
-    console.log(detailId);
+    setDetailAnswerId(detailAnswerId === newValue ? 0 : newValue);
+    console.log(detailAnswerId);
   };
 
-  const handleSaveAnswer = async (index, status) => {
-    const answer = answers[index];
+  // save answer
+  const handleSaveAnswer = async (questionIndex, answerIndex, status) => {
+    const answer = questions[questionIndex]["answers"][answerIndex];
     
     console.log("q_id, title, description", questionId, answer.title, answer.description);
     try {
@@ -131,11 +135,15 @@ const App = () => {
     
       setAnswersFromDB(data);
 
-      const _answers = answers.map((el, idx)=>{
-        if (idx === index) return {...el, status: status}
-        return el
-      })
-      setAnswers(_answers)
+      let _questions = questions;
+      _questions[questionIndex]['answers'][answerIndex].status = status;
+      setQuestions(_questions);
+
+      // const _answers = answers.map((el, idx)=>{
+      //   if (idx === index) return {...el, status: status}
+      //   return el
+      // })
+      // setAnswers(_answers)
       
     } catch (error) {
       console.error("Something went wrong.");
@@ -157,14 +165,50 @@ const App = () => {
       return;
     }
 
-    setAnswers([]);
+    setDetailAnswerId(0);
+    setQuestions([]);
 
-    getAiAnswers();
-
-    getAnswersByQuestion();
+    getSimilarQuestions(question);
   }
 
-  const getAiAnswers = async () => {
+  // filter similar questions to the input question from db.
+  const getSimilarQuestions = async (question) => {
+    try {
+      let res = await axios.post(
+        base_url + '/question/getSimilarQuestions',
+        {
+          title: question
+        }
+      );
+
+      let data = res.data.data;
+      console.log("data.q_id => ", data.q_id);
+      console.log("data.questions => ", data.questions);
+
+      setQuestionId(data.q_id);
+
+      let questionListItems = [];
+      data.questions.map((item, index) => {
+        let listItem = {
+          question: item,
+          answers: []
+        };
+        questionListItems.push(listItem);
+      })
+
+      console.log("questionListItems => ", questionListItems);
+      setQuestions(questionListItems);
+
+      getAiAnswers(questionListItems);
+
+      getAnswersByQuestion(questionId);
+    } catch (error) {
+      console.error(error);
+    }
+  }
+
+  // get answers from chatgpt
+  const getAiAnswers = async (questionItems) => {
     setIsLoading(true);
 
     const questionTemplatePrefix = 'Here is one question. "';
@@ -179,10 +223,27 @@ const App = () => {
       );
       
       let data = res.data ;
+      let aiAnswers =  JSON.parse(data.message);
       console.log(data);
-    
-      setDetailId(0);
-      setAnswers(JSON.parse(data.message));
+
+      console.log("questions => ", questions);  
+
+      let tempListItems = [];
+      questionItems.map((item, index) => {
+        if (index === 0) {
+          tempListItems.push({
+            question: item.question,
+            answers: aiAnswers
+          })
+        } else {
+          tempListItems.push({
+            question: item.question,
+            answers: []
+          })
+        }
+      })
+
+      setQuestions(tempListItems);
     } catch (error) {
       console.error("Something went wrong.");
       console.error(error);
@@ -191,21 +252,22 @@ const App = () => {
     setIsLoading(false);
   }
 
-  const getAnswersByQuestion = async () => {
+  // Get answers for question from db
+  const getAnswersByQuestion = async (q_id) => {
     try {
-      let res = await axios.post(
-        base_url + '/question/findByTitle',
+      let res = await axios.get(
+        base_url + '/answer/findByQId',
         {
-          title: question
+          params: {
+            q_id: q_id
+          }
         }
       );
 
       let data = res.data.data;
-      console.log("data => ", data);
-      console.log("data.q_id => ", data.q_id);
       console.log("data.answers => ", data.answers);
 
-      setQuestionId(data.q_id);
+      setDetailQuestionId(q_id);
       setAnswersFromDB(data.answers);
     } catch (error) {
       console.error(error);
@@ -240,27 +302,36 @@ const App = () => {
           className='answer-list'
           subheader={
             <>
-              <ListSubheader>Answers</ListSubheader>
+              <ListSubheader>Questions</ListSubheader>
               <Divider />
             </>
           }
         >
-          {answers.map((row, index) => (
-            row.status === undefined || row.status === ANSWER_STATUS.NONE
-            ?
-              <div key={index}>
-                <ListItem >
-                  <ListItemText primary={ row.title } />
-                  <ButtonGroup variant="outlined" aria-label="outlined button group">
-                      <Button className={ row.status === ANSWER_STATUS.YES ? 'active' : '' } onClick={ ()=> handleSaveAnswer(index, ANSWER_STATUS.YES) }>Yes</Button>
-                      <Button className={ row.status === ANSWER_STATUS.MAYBE ? 'active' : '' } onClick={ ()=>handleSaveAnswer(index, ANSWER_STATUS.MAYBE) }>Maybe</Button>
-                      <Button className={ row.status === ANSWER_STATUS.NO ? 'active' : '' } onClick={ ()=> handleSaveAnswer(index, ANSWER_STATUS.NO) }>No</Button>
-                    </ButtonGroup>
-                </ListItem>
-                <Divider />
-              </div>
-            :
-            null
+          {questions.map((question, question_index) => (
+            <div key={ question_index }>
+              <ListItemButton selected={ question.question.id === detailQuestionId } onClick={ () => getAnswersByQuestion(question.question.id) }>
+                <ListItemText primary={ question.question.title } />
+              </ListItemButton>
+              <Divider></Divider>
+
+              {question.answers.map((answer, answer_index) => (
+                answer.status === undefined || answer.status === ANSWER_STATUS.NONE
+                ?
+                  <div key={ answer_index }>
+                    <ListItem sx={{ pl: 4, display: "block" }}>
+                      <ListItemText primary={ answer.title } />
+                      <ButtonGroup variant="outlined" aria-label="outlined button group">
+                          <Button className={ answer.status === ANSWER_STATUS.YES ? 'active' : '' } onClick={ ()=> handleSaveAnswer(question_index, answer_index, ANSWER_STATUS.YES) }>Yes</Button>
+                          <Button className={ answer.status === ANSWER_STATUS.MAYBE ? 'active' : '' } onClick={ ()=>handleSaveAnswer(question_index, answer_index, ANSWER_STATUS.MAYBE) }>Maybe</Button>
+                          <Button className={ answer.status === ANSWER_STATUS.NO ? 'active' : '' } onClick={ ()=> handleSaveAnswer(question_index, answer_index, ANSWER_STATUS.NO) }>No</Button>
+                        </ButtonGroup>
+                    </ListItem>
+                    <Divider sx={{ ml: 4, display: "block" }}></Divider>
+                  </div>
+                :
+                null
+              ))}
+            </div>
           ))}
         </List>
         
@@ -276,7 +347,7 @@ const App = () => {
             <TabPanel value={ ANSWER_STATUS.YES }>
               <CustomTabList
                 answers={ answersFromDB }
-                detailId={ detailId }
+                detailAnswerId={ detailAnswerId }
                 tabId={ ANSWER_STATUS.YES }
                 handleCollapseChange= { handleCollapseChange }
               />
@@ -284,7 +355,7 @@ const App = () => {
             <TabPanel value={ ANSWER_STATUS.MAYBE }>
               <CustomTabList
                 answers={ answersFromDB }
-                detailId={ detailId }
+                detailAnswerId={ detailAnswerId }
                 tabId={ ANSWER_STATUS.MAYBE }
                 handleCollapseChange= { handleCollapseChange }
               />
@@ -292,7 +363,7 @@ const App = () => {
             <TabPanel value={ ANSWER_STATUS.NO }>
               <CustomTabList
                 answers={ answersFromDB }
-                detailId={ detailId }
+                detailAnswerId={ detailAnswerId }
                 tabId={ ANSWER_STATUS.NO }
                 handleCollapseChange= { handleCollapseChange }
               />

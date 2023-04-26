@@ -10,6 +10,7 @@ var Answer = function(answer){
     this.status         = answer.status;
     // this.created_at     = new Date();
 };
+
 Answer.create = function (newAnswer, result) {    
     dbConn.query("INSERT INTO answer set ?", newAnswer, function (err, res) {
         if(err) {
@@ -25,6 +26,7 @@ Answer.create = function (newAnswer, result) {
         }
     });           
 };
+
 Answer.findByQId = function (q_id, result) {
     console.log("findByQId, q_id = ", q_id);
     dbConn.query("Select * from answer where q_id = ? order by title asc", q_id, function (err, res) {             

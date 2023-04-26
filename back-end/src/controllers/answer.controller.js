@@ -21,4 +21,21 @@ methods.create = function(req, res) {
     }
 };
 
+methods.findByQId = function(req, res) {
+    //handles null error 
+    console.log("req.query", req.query);
+    
+    Answer.findByQId(req.query.q_id, function(err2, result) {
+        if (err2) {
+            console.log("findByQId, err = ", err2);
+            res.send(err2);
+        } else {
+            console.log("findByQId, result = ", result);
+            res.json({error: false, message: "success",data: {
+                answers: result
+            }});
+        }
+    })
+};
+
 module.exports = methods;

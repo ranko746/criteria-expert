@@ -33,6 +33,18 @@ Question.findByTitle = function (title, result) {
     });   
 };
 
+Question.getSimilarQuestions = function (title, result) {
+    dbConn.query("SELECT id, title, levenshtein_ratio(title, ?) as ratio from question WHERE levenshtein_ratio(title, ?) > 0.5 ORDER BY ratio DESC", [title, title], function (err, res) {             
+        if(err) {
+            console.log("error: ", err);
+            result(err, null);
+        } else {
+            console.log("result: ", res);
+            result(null, res)
+        }
+    });   
+};
+
 Question.create = function (newQue, result) {    
     dbConn.query("INSERT INTO question set ?", newQue, function (err, res) {
         if(err) {
